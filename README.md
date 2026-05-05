@@ -8,6 +8,8 @@
 ![Node.js](https://img.shields.io/badge/Node.js-Express-339933?style=for-the-badge&logo=node.js&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
 
+🟢 **LIVE DEMO:** [Acesse o ORGANIZA Ao Vivo Aqui](https://organiza-dashboard-full.vercel.app)
+
 ---
 
 ## 💻 Sobre o Projeto
