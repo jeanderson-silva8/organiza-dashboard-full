@@ -3,20 +3,43 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const Task = require('../models/Task');
 
+// ═══════════════════════════════════════════════════════
+// 🛡️ PROTOCOLO DE SEGURANÇA ENTERPRISE — ROTAS PROTEGIDAS
+// ═══════════════════════════════════════════════════════
+
+// Helpers de Sanitização
+function sanitizeString(str, maxLength = 500) {
+  if (typeof str !== 'string') return '';
+  return str.trim().slice(0, maxLength);
+}
+
+const VALID_STATUSES = ['todo', 'in-progress', 'done', 'pending', 'completed'];
+const VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+
 // GET /api/tasks
 router.get('/', auth, async (req, res) => {
   try {
     const tasks = await Task.find({ user: req.user.id }).sort({ createdAt: -1 });
     res.json(tasks);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    console.error('[TASKS] Erro ao listar:', err.code || 'UNKNOWN');
+    res.status(500).json({ msg: 'Erro interno do servidor.' });
   }
 });
 
 // POST /api/tasks
 router.post('/', auth, async (req, res) => {
-  const { title, description, status, priority, dueDate } = req.body;
+  // [SEGURANÇA] Sanitização de todos os inputs
+  const title = sanitizeString(req.body.title, 200);
+  const description = sanitizeString(req.body.description, 2000);
+  const status = VALID_STATUSES.includes(req.body.status) ? req.body.status : 'todo';
+  const priority = VALID_PRIORITIES.includes(req.body.priority) ? req.body.priority : 'medium';
+  const dueDate = req.body.dueDate;
+
+  if (!title || title.length < 1) {
+    return res.status(400).json({ msg: 'Título é obrigatório.' });
+  }
+
   try {
     const newTask = new Task({
       title,
@@ -29,8 +52,8 @@ router.post('/', auth, async (req, res) => {
     const task = await newTask.save();
     res.json(task);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    console.error('[TASKS] Erro ao criar:', err.code || 'UNKNOWN');
+    res.status(500).json({ msg: 'Erro interno do servidor.' });
   }
 });
 
@@ -45,20 +68,19 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(401).json({ msg: 'Not authorized' });
     }
 
-    const { title, description, status, priority, dueDate } = req.body;
-    
+    // [SEGURANÇA] Sanitização dos campos de update
     const fields = {};
-    if (title) fields.title = title;
-    if (description !== undefined) fields.description = description;
-    if (status) fields.status = status;
-    if (priority) fields.priority = priority;
-    if (dueDate) fields.dueDate = dueDate;
+    if (req.body.title) fields.title = sanitizeString(req.body.title, 200);
+    if (req.body.description !== undefined) fields.description = sanitizeString(req.body.description, 2000);
+    if (req.body.status && VALID_STATUSES.includes(req.body.status)) fields.status = req.body.status;
+    if (req.body.priority && VALID_PRIORITIES.includes(req.body.priority)) fields.priority = req.body.priority;
+    if (req.body.dueDate) fields.dueDate = req.body.dueDate;
 
     task = await Task.findByIdAndUpdate(req.params.id, { $set: fields }, { new: true });
     res.json(task);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    console.error('[TASKS] Erro ao atualizar:', err.code || 'UNKNOWN');
+    res.status(500).json({ msg: 'Erro interno do servidor.' });
   }
 });
 
@@ -76,8 +98,8 @@ router.delete('/:id', auth, async (req, res) => {
     await Task.findByIdAndDelete(req.params.id);
     res.json({ msg: 'Task removed' });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
+    console.error('[TASKS] Erro ao deletar:', err.code || 'UNKNOWN');
+    res.status(500).json({ msg: 'Erro interno do servidor.' });
   }
 });
 
