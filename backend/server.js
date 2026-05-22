@@ -33,7 +33,12 @@ app.use(cors({
   origin: function (origin, callback) {
     // Permite requisições sem origin (ex: Postman, curl em dev)
     if (!origin) return callback(null, true);
+    // Permite origens da lista fixa
     if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    // Permite URLs de preview/deploy da Vercel (ex: organiza-dashboard-full-abc123.vercel.app)
+    if (/^https:\/\/organiza-dashboard-full.*\.vercel\.app$/.test(origin)) {
       return callback(null, true);
     }
     return callback(new Error('Bloqueado pela política de CORS'));
