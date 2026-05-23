@@ -8,7 +8,7 @@
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Deploy-Vercel_Serverless-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![CI](https://img.shields.io/github/actions/workflow/status/jeanderson-silva8/organiza-dashboard-full/ci.yml?branch=main&style=for-the-badge&label=CI&logo=githubactions&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-24%2F24_passing-success?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-33%2F33_passing-success?style=for-the-badge&logo=nodedotjs&logoColor=white)
 
 🟢 **LIVE DEMO:** [Acesse o ORGANIZA Ao Vivo Aqui](https://organiza-dashboard-full.vercel.app)
 🛡️ **Auditoria de Segurança Aplicada:** [Veja a auditoria 2026-05-22](docs/AUDIT_REPORT_2026-05-22.md)
@@ -69,7 +69,7 @@ JWT em deploy tradicional é trivial. Em serverless, decisões aparentemente peq
 | Frontend XSS | Zero `dangerouslySetInnerHTML`/`innerHTML`/`eval`; JSX escapa por padrão | ✅ |
 | Source maps em prod | Vite com `sourcemap: false` (default) — código-fonte não exposto | ✅ |
 | Segredos no bundle | Frontend só usa `VITE_API_URL` (URL, não segredo); nada sensível com prefixo `VITE_`; guard no CI faz `grep` por padrões de segredo no `dist/` | ✅ |
-| Testes adversariais | 24 testes (`node:test` + Supertest + `mongodb-memory-server`): IDOR em PUT/DELETE, `alg:none` rejeitado, anti-enumeração no login e forgot-password, regressão do enum 🔴 | ✅ |
+| Testes adversariais | 33 testes (`node:test` + Supertest + `mongodb-memory-server`): IDOR em PUT/DELETE, `alg:none` rejeitado, anti-enumeração no login e forgot-password, regressão do enum 🔴, suíte completa do `reset-password` (cross-id, reuso após troca, token sem `+user.password`, expirado) | ✅ |
 | CI | GitHub Actions a cada PR: testes do backend, lint+build do frontend, `npm audit --audit-level=high`, guard de segredo no bundle | ✅ |
 
 ### O que NÃO está implementado (e por quê)
