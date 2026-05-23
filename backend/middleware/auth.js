@@ -13,7 +13,11 @@ module.exports = function(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // [SEGURANÇA] Algoritmo fixado — impede ataque de confusão de algoritmo (alg: none / RS↔HS)
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    if (!decoded.user || !decoded.user.id) {
+      return res.status(401).json({ msg: 'Token is not valid' });
+    }
     req.user = decoded.user;
     next();
   } catch (err) {

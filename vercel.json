@@ -8,5 +8,22 @@
       "entrypoint": "backend/server.js",
       "routePrefix": "/api"
     }
-  }
+  },
+  "headers": [
+    {
+      "_comment": "Headers de segurança aplicados a todas as respostas servidas pela Vercel (frontend estático). O backend já recebe Helmet por dentro do Express; aqui cobrimos o frontend que antes saía sem CSP/HSTS. Auditoria 2026-05-22. 'unsafe-inline' em script-src é dívida do bootstrap do Vite (documentada em ADR — mesmo trade-off do Nexus Portal).",
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https://api.dicebear.com; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+        },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=(), payment=(), usb=()" }
+      ]
+    }
+  ]
 }

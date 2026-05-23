@@ -45,13 +45,13 @@ const Dashboard = () => {
     // Forçar repaint no Safari mobile: desligar e religar a visibilidade
     // Isso invalida a camada compositing da GPU e previne tela preta/verde
     document.body.style.display = 'none';
-    // eslint-disable-next-line no-unused-expressions
-    document.body.offsetHeight; // trigger reflow
+    const _unused = document.body.offsetHeight; // trigger reflow
     document.body.style.display = '';
   }, [theme]);
 
   useEffect(() => {
     loadTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadTasks = async () => {
@@ -80,7 +80,7 @@ const Dashboard = () => {
       setFormData({ title: '', priority: 'Média', dueDate: '' });
       showToast('Tarefa criada com sucesso!', 'success');
       loadTasks();
-    } catch (err) {
+    } catch {
       showToast('Erro ao criar tarefa', 'error');
     }
   };
@@ -93,7 +93,7 @@ const Dashboard = () => {
       showToast('Tarefa excluída!', 'success');
       setDeleteModal({ show: false, taskId: null });
       loadTasks();
-    } catch (err) {
+    } catch {
       showToast('Erro ao excluir', 'error');
     }
   };
@@ -103,7 +103,7 @@ const Dashboard = () => {
       await api.put(`/tasks/${id}`, { status });
       showToast(`Status atualizado para ${status}`, 'success');
       loadTasks();
-    } catch (err) {
+    } catch {
       showToast('Erro ao atualizar status', 'error');
     }
   };
@@ -120,7 +120,7 @@ const Dashboard = () => {
       setEditingTask(null);
       showToast('Título atualizado!', 'success');
       loadTasks();
-    } catch (err) {
+    } catch {
       showToast('Erro ao atualizar', 'error');
     }
   };

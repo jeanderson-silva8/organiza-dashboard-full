@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend — testes + audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Run tests (Node test runner + Supertest + mongodb-memory-server)
+        run: npm test
+
+      - name: Audit dependencies (prod, fail em high+)
+        run: npm audit --audit-level=high --omit=dev
+
+  frontend:
+    name: Frontend — lint + build + audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (valida que o bundle sai)
+        run: npm run build
+
+      - name: Audit dependencies (prod, fail em high+)
+        run: npm audit --audit-level=high --omit=dev
+
+      # [SEGURANÇA] Guard do item 58 do checklist (Protocolo de Segurança v1.8.0):
+      # nenhum padrão de segredo deve aparecer no bundle público entregue ao navegador.
+      # Falha o CI se encontrar — defesa contra `VITE_*` indevida ou hardcode.
+      - name: Verifica que nenhum segredo vazou para o bundle
+        run: |
+          set -e
+          if grep -rE '(sk_live_|sk_test_|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36})' dist/; then
+            echo "::error::Padrão de segredo encontrado no bundle público. Veja docs/AUDIT_REPORT_*.md item 58."
+            exit 1
+          fi
+          echo "✓ Nenhum padrão de segredo no dist/."

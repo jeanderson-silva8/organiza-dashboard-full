@@ -8,13 +8,33 @@ const connectDB = require('./config/db');
 // Carrega variáveis do .env
 dotenv.config();
 
+// ═══════════════════════════════════════════════════════
+// 🛡️ FAIL-FAST DE ENVS — falha cedo, com erro claro
+// ═══════════════════════════════════════════════════════
+// Sem isso, JWT_SECRET ausente só quebraria no primeiro login (secret undefined),
+// e EMAIL_USER/PASS só no primeiro forgot-password. Auditoria 2026-05-22.
+const REQUIRED_ENVS = ['MONGO_URI', 'JWT_SECRET', 'EMAIL_USER', 'EMAIL_PASS'];
+const missingEnvs = REQUIRED_ENVS.filter((k) => !process.env[k] || process.env[k].trim() === '');
+if (missingEnvs.length > 0) {
+  console.error(
+    `[BOOT] Variáveis de ambiente obrigatórias ausentes: ${missingEnvs.join(', ')}. ` +
+      `Defina-as no .env (local) ou nas Environment Variables do projeto na Vercel.`
+  );
+  throw new Error(`Missing required env vars: ${missingEnvs.join(', ')}`);
+}
+// JWT_SECRET muito curto = secret fraco. CSPRNG mínimo recomendado: 32 bytes ⇒ ≥ 32 chars.
+if (process.env.JWT_SECRET.length < 32) {
+  console.error('[BOOT] JWT_SECRET muito curto. Use `openssl rand -base64 64` para gerar.');
+  throw new Error('JWT_SECRET too short (min 32 chars)');
+}
+
 // Conecta MongoDB
 connectDB();
 
 const app = express();
 
 // ═══════════════════════════════════════════════════════
-// 🛡️ PROTOCOLO DE SEGURANÇA ENTERPRISE — CAMADA 3 & 4
+// 🛡️ Camadas de segurança aplicadas
 // ═══════════════════════════════════════════════════════
 
 // [SEGURANÇA] Headers HTTP de proteção (Helmet)
@@ -46,8 +66,15 @@ app.use(cors({
   credentials: true
 }));
 
-// [SEGURANÇA] Rate Limiting Global — Proteção contra DDoS
-const globalLimiter = rateLimit({
+// [SEGURANÇA] Rate Limiting — best effort em serverless (ver ADR-002).
+// Store in-memory: contadores zeram a cada cold start. Mitigação real de força
+// bruta vem do bcrypt cost 12. Migração para Vercel KV/Upstash é trabalho futuro.
+// Em ambiente de teste, viramos no-op para não atrapalhar os testes adversariais
+// (que disparam dezenas de requests em sequência contra /auth).
+const isTest = process.env.NODE_ENV === 'test';
+const noopLimiter = (req, res, next) => next();
+
+const globalLimiter = isTest ? noopLimiter : rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 200, // Máximo 200 requisições por IP a cada 15 min
   standardHeaders: true,
@@ -56,8 +83,8 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// [SEGURANÇA] Rate Limiting de Login — Anti Força Bruta
-const authLimiter = rateLimit({
+// [SEGURANÇA] Rate Limiting agressivo em /auth — janela curta, threshold baixo
+const authLimiter = isTest ? noopLimiter : rateLimit({
   windowMs: 60 * 1000, // 1 minuto
   max: 5, // Máximo 5 tentativas por minuto
   standardHeaders: true,
@@ -82,7 +109,11 @@ app.use('/tasks', require('./routes/tasks'));
 
 const PORT = process.env.PORT || 5000;
 
-if (process.env.NODE_ENV !== 'production') {
+// Só ouve uma porta quando o arquivo é executado diretamente (npm run dev / node server.js).
+// Em produção serverless (Vercel) e em testes (require do supertest), o módulo é
+// apenas importado e o handler é usado via `module.exports`. require.main !== module
+// nesses casos. Isso evita conflito de porta entre suíte de testes paralela.
+if (require.main === module && process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`Servidor rodando porta ${PORT}`);
   });

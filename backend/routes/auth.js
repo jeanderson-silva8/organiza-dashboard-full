@@ -22,7 +22,8 @@ function isValidEmail(email) {
 }
 
 function isValidPassword(password) {
-  return typeof password === 'string' && password.length >= 6 && password.length <= 128;
+  // [SEGURANÇA] Mínimo 8 caracteres (recomendação NIST — comprimento > complexidade)
+  return typeof password === 'string' && password.length >= 8 && password.length <= 128;
 }
 
 // POST /api/auth/register
@@ -39,7 +40,7 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ msg: 'Formato de e-mail inválido.' });
   }
   if (!isValidPassword(password)) {
-    return res.status(400).json({ msg: 'Senha deve ter entre 6 e 128 caracteres.' });
+    return res.status(400).json({ msg: 'Senha deve ter entre 8 e 128 caracteres.' });
   }
 
   try {
@@ -57,8 +58,9 @@ router.post('/register', async (req, res) => {
     
     const payload = { user: { id: user.id } };
 
-    // [SEGURANÇA] JWT expira em 15 minutos (não mais 1 dia)
-    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' }, (err, token) => {
+    // [SEGURANÇA] Access token stateless (sem refresh) — expira em 2h.
+    // Trade-off documentado em docs/adr/ADR-001-auth-jwt-stateless.md
+    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '2h', algorithm: 'HS256' }, (err, token) => {
       if (err) throw err;
       res.json({ token, user: { id: user.id, username: user.username, email: user.email }});
     });
@@ -95,8 +97,8 @@ router.post('/login', async (req, res) => {
 
     const payload = { user: { id: user.id } };
 
-    // [SEGURANÇA] JWT expira em 15 minutos
-    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' }, (err, token) => {
+    // [SEGURANÇA] Access token stateless — expira em 2h (ver ADR-001)
+    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '2h', algorithm: 'HS256' }, (err, token) => {
       if (err) throw err;
       res.json({ token, user: { id: user.id, username: user.username, email: user.email } });
     });
@@ -168,13 +170,20 @@ router.post('/forgot-password', async (req, res) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
-    // [SEGURANÇA] Resposta genérica — não confirma se o e-mail existe
+    // [SEGURANÇA] Envio assíncrono (fire-and-forget) para fechar o side-channel
+    // de timing — a resposta sai imediatamente; falhas de SMTP só vão para o log.
+    // Sem isso, o tempo de resposta diferenciava e-mail existente (lento, sendMail)
+    // de inexistente (rápido) — permitia enumeração de usuários. Auditoria 2026-05-22.
+    transporter.sendMail(mailOptions).catch((mailErr) => {
+      console.error('[AUTH] Falha ao enviar e-mail de recuperação:', mailErr.code || 'UNKNOWN');
+    });
+
     res.json({ msg: 'Se o e-mail estiver cadastrado, você receberá um link de recuperação.' });
-    
+
   } catch (err) {
-    console.error('[AUTH] Erro ao enviar e-mail de recuperação:', err.code || 'UNKNOWN');
-    res.status(500).json({ msg: 'Erro no servidor ao processar sua solicitação.' });
+    console.error('[AUTH] Erro ao processar recuperação:', err.code || 'UNKNOWN');
+    // Mesma resposta genérica em caso de erro inesperado — não vazar nada
+    res.json({ msg: 'Se o e-mail estiver cadastrado, você receberá um link de recuperação.' });
   }
 });
 
@@ -185,7 +194,7 @@ router.post('/reset-password/:id/:token', async (req, res) => {
 
   // [SEGURANÇA] Validação do novo password
   if (!isValidPassword(password)) {
-    return res.status(400).json({ msg: 'Senha deve ter entre 6 e 128 caracteres.' });
+    return res.status(400).json({ msg: 'Senha deve ter entre 8 e 128 caracteres.' });
   }
 
   try {
@@ -196,7 +205,8 @@ router.post('/reset-password/:id/:token', async (req, res) => {
     const secret = process.env.JWT_SECRET + user.password;
     
     try {
-      jwt.verify(token, secret);
+      // [SEGURANÇA] Algoritmo fixado também na verificação do token de reset
+      jwt.verify(token, secret, { algorithms: ['HS256'] });
     } catch (err) {
       return res.status(400).json({ msg: 'Token expirado ou inválido. Solicite novamente.' });
     }
