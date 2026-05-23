@@ -65,6 +65,18 @@ A auditoria classificou como 🟠 importante e ofereceu dois caminhos:
 
 ---
 
+## Nota sobre `/auth/reset-password/:id/:token` (peer review 2026-05-22)
+
+O endpoint de reset-password **compartilha o `authLimiter`** com `/login`, `/register` e `/forgot-password` — não tem janela dedicada. Isso significa que uma tempestade de tentativas de login pode "comer" parte do orçamento de tentativas legítimas de reset. Aceito porque:
+
+1. O **token de reset tem 256 bits de entropia** (HMAC-SHA256 sobre `JWT_SECRET + user.password`) — brute force é matematicamente impraticável independentemente do rate limit.
+2. O `authLimiter` já protege contra fuzzing massivo do endpoint (5 req/min é apertado).
+3. Janela dedicada por `:id` exigiria `keyGenerator` customizado + decisão sobre fallback se o IP for diferente — complexidade desproporcional ao risco.
+
+Se um dia for adicionado um endpoint mais sensível em `/auth` (ex: `/auth/2fa-disable`, `/auth/change-email`), revisitar — o orçamento compartilhado pode ficar apertado.
+
+---
+
 ## Quando reabrir esta decisão
 
 - Se o produto começar a ter **tráfego real** e o rate limit virar parte da SLA.

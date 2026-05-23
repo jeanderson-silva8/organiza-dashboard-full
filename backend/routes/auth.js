@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const auth = require('../middleware/auth');
@@ -191,6 +192,13 @@ router.post('/forgot-password', async (req, res) => {
 router.post('/reset-password/:id/:token', async (req, res) => {
   const { id, token } = req.params;
   const password = req.body.password;
+
+  // [SEGURANÇA] Valida formato do ID antes de qualquer consulta (peer review 2026-05-22).
+  // Sem isso, ID malformado vira CastError → 500 e dá fingerprinting ao atacante.
+  // Mesmo padrão aplicado em tasks.js — correção inconsistente identificada na peer review.
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ msg: 'Link inválido.' });
+  }
 
   // [SEGURANÇA] Validação do novo password
   if (!isValidPassword(password)) {

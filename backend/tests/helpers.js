@@ -10,25 +10,31 @@ let mongoServer;
 let app;
 
 async function startTestEnv() {
-  if (app) return app;
+  // Se não há mongoServer ou ele foi parado, cria um novo
+  if (!mongoServer) {
+    mongoServer = await MongoMemoryServer.create();
+    process.env.MONGO_URI = mongoServer.getUri();
+  }
 
-  mongoServer = await MongoMemoryServer.create();
-
+  // Popula envs obrigatórias (idempotente — não causa erro se já existem)
   process.env.NODE_ENV = 'test';
-  process.env.MONGO_URI = mongoServer.getUri();
   // JWT_SECRET precisa ter >= 32 chars (fail-fast no boot)
-  process.env.JWT_SECRET = 'test-secret-must-be-at-least-32-characters-long-and-strong';
-  process.env.EMAIL_USER = 'test@example.com';
-  process.env.EMAIL_PASS = 'test-pass-for-ci-only';
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    process.env.JWT_SECRET = 'test-secret-must-be-at-least-32-characters-long-and-strong';
+  }
+  process.env.EMAIL_USER = process.env.EMAIL_USER || 'test@example.com';
+  process.env.EMAIL_PASS = process.env.EMAIL_PASS || 'test-pass-for-ci-only';
 
-  app = require('../server');
-
-  // server.js faz connectDB() sem await; espera o Mongoose ficar conectado.
+  // Se a conexão Mongoose morreu (ex: stopTestEnv anterior), reconecta
   if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve, reject) => {
-      mongoose.connection.once('open', resolve);
-      mongoose.connection.once('error', reject);
-    });
+    global.__mongooseConn = null;
+    const connectDB = require('../config/db');
+    await connectDB();
+  }
+
+  // Carrega o app apenas uma vez (require cache)
+  if (!app) {
+    app = require('../server');
   }
 
   return app;
@@ -36,11 +42,16 @@ async function startTestEnv() {
 
 async function stopTestEnv() {
   try { await mongoose.disconnect(); } catch (_) { /* ignore */ }
-  if (mongoServer) await mongoServer.stop();
-  app = null;
+  if (mongoServer) {
+    await mongoServer.stop();
+    mongoServer = null;
+  }
+  global.__mongooseConn = null;
 }
 
 async function clearDb() {
+  // Se a conexão não está ativa, ignora a limpeza silenciosamente.
+  if (mongoose.connection.readyState !== 1) return;
   const db = mongoose.connection.db;
   if (!db) return;
   const collections = await db.collections();
@@ -49,8 +60,8 @@ async function clearDb() {
   }
 }
 
-async function registerUser(app, { username = 'user', email, password = 'StrongPass123!' }) {
-  const res = await request(app)
+async function registerUser(appInstance, { username = 'user', email, password = 'StrongPass123!' }) {
+  const res = await request(appInstance)
     .post('/api/auth/register')
     .send({ username, email, password });
   if (res.status !== 200) {

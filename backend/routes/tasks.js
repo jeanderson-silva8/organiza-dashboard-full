@@ -57,7 +57,7 @@ router.post('/', auth, async (req, res) => {
     const task = await newTask.save();
     res.json(task);
   } catch (err) {
-    console.error('[TASKS] Erro ao criar:', err.code || 'UNKNOWN');
+    console.error('[TASKS] Erro ao criar:', err.message || err.code || 'UNKNOWN');
     res.status(500).json({ msg: 'Erro interno do servidor.' });
   }
 });

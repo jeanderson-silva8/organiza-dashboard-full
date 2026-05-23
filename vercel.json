@@ -1,17 +1,24 @@
 {
-  "experimentalServices": {
-    "frontend": {
-      "entrypoint": "frontend",
-      "routePrefix": "/"
+  "builds": [
+    {
+      "src": "backend/server.js",
+      "use": "@vercel/node"
     },
-    "backend": {
-      "entrypoint": "backend/server.js",
-      "routePrefix": "/api"
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     }
-  },
+  ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/backend/server.js" },
+    { "source": "/(.*)", "destination": "/frontend/$1" }
+  ],
   "headers": [
     {
-      "_comment": "Headers de segurança aplicados a todas as respostas servidas pela Vercel (frontend estático). O backend já recebe Helmet por dentro do Express; aqui cobrimos o frontend que antes saía sem CSP/HSTS. Auditoria 2026-05-22. 'unsafe-inline' em script-src é dívida do bootstrap do Vite (documentada em ADR — mesmo trade-off do Nexus Portal).",
+      "_comment": "Headers de segurança aplicados a todas as respostas servidas pela Vercel (frontend estático). O backend já recebe Helmet por dentro do Express; aqui cobrimos o frontend que antes saía sem CSP/HSTS. Auditoria 2026-05-22.",
       "source": "/(.*)",
       "headers": [
         {

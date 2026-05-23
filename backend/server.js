@@ -28,10 +28,22 @@ if (process.env.JWT_SECRET.length < 32) {
   throw new Error('JWT_SECRET too short (min 32 chars)');
 }
 
-// Conecta MongoDB
-connectDB();
-
 const app = express();
+
+// [SERVERLESS] Middleware que garante conexão MongoDB ativa antes de processar qualquer request.
+// Em serverless (Vercel), o top-level executa no cold start, mas connectDB() retorna uma promise
+// que pode NÃO ter resolvido quando o primeiro request chega. Sem este middleware, o Mongoose
+// tenta operar sem conexão ativa e falha silenciosamente (err.code === undefined → "UNKNOWN").
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('[DB] Falha ao conectar antes do request:', err.message);
+    res.status(503).json({ msg: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+});
+
 
 // ═══════════════════════════════════════════════════════
 // 🛡️ Camadas de segurança aplicadas
@@ -63,7 +75,10 @@ app.use(cors({
     }
     return callback(new Error('Bloqueado pela política de CORS'));
   },
-  credentials: true
+  // [SEGURANÇA] credentials: false — autenticação é via header `Authorization: Bearer`,
+  // não via cookie. Sem cookies, habilitar credentials apenas amplia a superfície de
+  // CORS sem entregar nenhum recurso. Peer review 2026-05-22.
+  credentials: false
 }));
 
 // [SEGURANÇA] Rate Limiting — best effort em serverless (ver ADR-002).
