@@ -18,7 +18,6 @@
   ],
   "headers": [
     {
-      "_comment": "Headers de segurança aplicados a todas as respostas servidas pela Vercel (frontend estático). O backend já recebe Helmet por dentro do Express; aqui cobrimos o frontend que antes saía sem CSP/HSTS. Auditoria 2026-05-22.",
       "source": "/(.*)",
       "headers": [
         {
